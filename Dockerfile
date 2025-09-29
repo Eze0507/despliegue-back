@@ -1,14 +1,17 @@
 # Usa la imagen base de Python (3.10 es una buena elección)
 FROM python:3.10-slim
 
-# Instala las dependencias del sistema necesarias para pycairo/xhtml2pdf
-# Esto es lo que resuelve el error "Dependency 'cairo' not found"
+# Instala las dependencias del sistema y las herramientas de compilación
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    # 🚨 NUEVO: Herramientas de compilación y headers de Python
+    build-essential \
+    python3-dev \
+    # Dependencias existentes para pycairo/xhtml2pdf
     pkg-config \
     libcairo2-dev \
-    # Limpia la caché para reducir el tamaño final de la imagen
     && \
+    # Limpia la caché para reducir el tamaño final de la imagen
     rm -rf /var/lib/apt/lists/*
 
 # Configura el directorio de trabajo
@@ -21,6 +24,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copia el resto del código del proyecto
 COPY . .
 
-# Comando de inicio (Deja este CMD, es el que ejecutaría tu Custom Start Command)
-# Reemplaza 'condominioBACK' con el nombre real de tu carpeta WSGI si es diferente.
+# Comando de inicio (Asegúrate que 'condominioBACK' es correcto)
 CMD ["gunicorn", "condominioBACK.wsgi:application"]

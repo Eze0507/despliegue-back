@@ -15,6 +15,15 @@ class AlprScanSerializer(serializers.Serializer):
         return attrs
 
 class LecturaPlacaSerializer(serializers.ModelSerializer):
+    propietario = serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = LecturaPlaca
         fields = "__all__"
+    
+    def get_propietario(self, obj):
+        try:
+            if obj.vehiculo and obj.vehiculo.persona:
+                return str(obj.vehiculo.persona)
+        except AttributeError:
+            pass
+        return None

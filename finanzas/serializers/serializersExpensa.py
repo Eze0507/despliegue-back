@@ -12,7 +12,6 @@ class ExpensaSerializer(serializers.ModelSerializer):
         model = Expensa
         fields = "__all__"  # incluye campos del modelo + los SerializerMethodField
         read_only_fields = [
-            "pagada",
             "fecha_emision",
             "stripe_session_id",
             "stripe_payment_intent_id",

@@ -1,53 +1,58 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from fcm_django.models import FCMDevice
+from firebase_admin.messaging import Message, Notification
 from .models import expensa, contrato
+import datetime
 
-# Esta función se ejecuta CADA VEZ que se guarda una expensa
+# Helper simple para meses en español (para evitar problemas de configuración de servidor)
+MESES = {
+    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
+    7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+}
+
 @receiver(post_save, sender=expensa)
 def enviar_notificacion_expensa(sender, instance, created, **kwargs):
-    # 'created' es True si es una expensa nueva. False si solo se editó.
     if created:
-        print(f"--- Nueva expensa creada para la unidad {instance.unidad.id} ---")
-        
         try:
-            # 1. Buscamos el contrato ACTIVO de esa unidad para saber quién es el dueño actual
-            # Usamos el related_name 'contratos_unidad' que definiste
-            contrato_activo = instance.unidad.contratos_unidad.filter(
-                estado='A'
-            ).first()
+            # 1. Buscar contrato activo y propietario
+            contrato_activo = instance.unidad.contratos_unidad.filter(estado='A').first()
 
-            if not contrato_activo:
-                print("No hay contrato activo para esta unidad. No se envía notificación.")
+            if not contrato_activo or not contrato_activo.propietario.user:
                 return
 
-            # 2. Obtenemos el propietario y su usuario de sistema
             propietario = contrato_activo.propietario
             usuario_dueno = propietario.user
+            
+            # 2. Preparar datos para el mensaje personalizado
+            nombre_persona = propietario.nombre.split()[0] # Tomamos solo el primer nombre
+            nombre_unidad = str(instance.unidad) # Asumiendo que el __str__ de unidad dice algo como "A-101"
+            
+            # Obtener el nombre del mes actual o de la fecha de emisión
+            mes_actual = MESES[instance.fecha_emision.month]
+            
+            # --- CREACIÓN DEL MENSAJE PERSONALIZADO ---
+            titulo_msg = f"Expensa de {mes_actual} 📅"
+            cuerpo_msg = f"Hola {nombre_persona}, se ha generado la cuota de tu unidad {nombre_unidad} por {instance.monto} {instance.currency}."
 
-            if not usuario_dueno:
-                print(f"El propietario {propietario} no tiene un usuario de sistema asignado.")
-                return
-
-            # 3. Buscamos los dispositivos (celulares) registrados de ese usuario
-            # FCMDevice es la tabla que crea la librería fcm_django
+            # 3. Buscar dispositivos
             dispositivos = FCMDevice.objects.filter(user=usuario_dueno)
 
             if dispositivos.exists():
-                # 4. Enviamos la notificación
                 dispositivos.send_message(
-                    title="Nueva Expensa Generada",
-                    body=f"Se ha generado una expensa de {instance.monto} {instance.currency} para tu unidad.",
-                    data={
-                        "tipo": "nueva_expensa",
-                        "expensa_id": str(instance.id),
-                        "monto": str(instance.monto)
-                    } 
-                    # 'data' es información oculta útil para que Flutter sepa a qué pantalla ir al tocar
+                    Message(
+                        notification=Notification(
+                            title=titulo_msg,
+                            body=cuerpo_msg
+                        ),
+                        data={
+                            "tipo": "nueva_expensa",
+                            "expensa_id": str(instance.id),
+                            "click_action": "FLUTTER_NOTIFICATION_CLICK"
+                        }
+                    )
                 )
-                print(f"Notificación enviada a {usuario_dueno.username}")
-            else:
-                print(f"El usuario {usuario_dueno.username} no tiene dispositivos registrados.")
+                print(f"✅ Notificación enviada a {nombre_persona} ({usuario_dueno.username})")
 
         except Exception as e:
-            print(f"Error enviando notificación: {e}")
+            print(f"Error en notificación: {e}")

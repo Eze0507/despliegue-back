@@ -18,7 +18,7 @@ import os
 import cloudinary
 import firebase_admin
 from firebase_admin import credentials
-
+import json
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -113,7 +113,6 @@ try:
             # 2. Fallback: Leemos el archivo físico (Ideal para Local)
             # Asegúrate de que este nombre sea correcto
             cred = credentials.Certificate("smart-condominiun-firebase-adminsdk-fbsvc-30dd8b557d.json")
-             
         firebase_admin.initialize_app(cred)
         print("Firebase inicializado correctamente.")
 

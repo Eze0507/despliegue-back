@@ -244,4 +244,28 @@ class Visita(models.Model):
     def __str__(self):
         return f"Visita de {self.visitante.nombre_completo} a {self.recibe_persona.nombre_completo} ({self.estado})"
 
+class ObjetoPerdido(models.Model):
+    ESTADOS = [
+        ('P', 'Pendiente de reclamo'),
+        ('E', 'Entregado/Devuelto'),
+    ]
 
+    titulo = models.CharField(max_length=100, verbose_name="Qué es")
+    descripcion = models.TextField(blank=True, null=True, verbose_name="Detalles")
+    foto = models.URLField(verbose_name="Foto del objeto") # Usas la URL de Cloudinary
+    lugar_encontrado = models.CharField(max_length=100, default="Áreas Comunes")
+    fecha_encontrado = models.DateTimeField(default=timezone.now)
+    
+    estado = models.CharField(max_length=1, choices=ESTADOS, default='P')
+    
+    # Opcional: Para saber a quién se lo devolvieron
+    entregado_a = models.ForeignKey(Persona, on_delete=models.SET_NULL, null=True, blank=True, related_name="objetos_reclamados")
+    fecha_entrega = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-fecha_encontrado']
+        verbose_name = "Objeto Perdido"
+        verbose_name_plural = "Objetos Perdidos"
+
+    def __str__(self):
+        return f"{self.titulo} ({self.get_estado_display()})"

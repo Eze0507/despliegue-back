@@ -4,6 +4,7 @@ from fcm_django.models import FCMDevice
 from firebase_admin.messaging import Message, Notification
 from .models import expensa, contrato
 import datetime
+from residencial.models import ObjetoPerdido
 
 # Helper simple para meses en español (para evitar problemas de configuración de servidor)
 MESES = {
@@ -56,3 +57,45 @@ def enviar_notificacion_expensa(sender, instance, created, **kwargs):
 
         except Exception as e:
             print(f"Error en notificación: {e}")
+
+@receiver(post_save, sender=ObjetoPerdido)
+def notificar_objeto_encontrado(sender, instance, created, **kwargs):
+    # Solo notificamos si es nuevo (created=True) y si el estado es 'Pendiente' ('P')
+    if created and instance.estado == 'P':
+        print(f"--- NUEVO OBJETO ENCONTRADO: {instance.titulo} ---")
+        
+        try:
+            # 1. Obtenemos TODOS los dispositivos registrados en el sistema
+            # (En un condominio real, esto le avisa a todos los vecinos)
+            dispositivos = FCMDevice.objects.all()
+            
+            if dispositivos.exists():
+                print(f"📡 Enviando difusión a {dispositivos.count()} dispositivos...")
+
+                # 2. Preparamos el mensaje
+                # Usamos emojis para hacerlo visual
+                titulo_msg = "🔍 Objeto Encontrado"
+                cuerpo_msg = f"Se encontró '{instance.titulo}' en {instance.lugar_encontrado}. ¿Es tuyo?"
+
+                # 3. Enviamos el mensaje a cada dispositivo
+                # Nota: Para proyectos grandes (miles de usuarios) se usan "Topics", 
+                # pero para tu examen este bucle o envío masivo funciona perfecto.
+                dispositivos.send_message(
+                    Message(
+                        notification=Notification(
+                            title=titulo_msg,
+                            body=cuerpo_msg
+                        ),
+                        data={
+                            "tipo": "objeto_perdido", # Para que Flutter sepa qué pantalla abrir
+                            "objeto_id": str(instance.id),
+                            "click_action": "FLUTTER_NOTIFICATION_CLICK"
+                        }
+                    )
+                )
+                print("✅ Notificación de objeto perdido enviada a todos.")
+            else:
+                print("⚠️ No hay dispositivos registrados para notificar.")
+
+        except Exception as e:
+            print(f"🔥 Error enviando notificación de objeto perdido: {e}")

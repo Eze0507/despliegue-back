@@ -11,6 +11,7 @@ from .serializers.serializersContrato import ContratoSerializer
 from .serializers.serializersExpensa import ExpensaSerializer
 from .serializers.serializersMulta import MultaSerializer
 from .common.pdf_utils import render_pdf_from_template
+from rest_framework.permissions import IsAuthenticated
 
 class ContratoViewSet(viewsets.ModelViewSet):
     queryset = contrato.objects.all()
@@ -55,8 +56,20 @@ class MultaViewSet(viewsets.ModelViewSet):
     serializer_class = MultaSerializer
 
 class ExpensaViewSet(viewsets.ModelViewSet):
-    queryset = expensa.objects.select_related("unidad", "unidad__bloque")
     serializer_class = ExpensaSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = expensa.objects.select_related("unidad", "unidad__bloque")
+        if user.is_superuser or user.is_staff:
+            return queryset
+        if user.groups.filter(name='administrador').exists():
+            return queryset
+        return queryset.filter(
+            unidad__contratos_unidad__propietario__user=user,
+            unidad__contratos_unidad__estado='A' 
+        ).distinct()
 
 
 

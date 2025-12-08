@@ -41,6 +41,13 @@ class Persona(models.Model):
     CI = models.CharField(max_length=20, unique=True, verbose_name="Cédula de Identidad")
     fecha_nacimiento = models.DateField(verbose_name="Fecha de Nacimiento")
     luxand_uuid = models.CharField(max_length=64, blank=True, null=True)
+    user = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE, 
+        blank=True, 
+        null=True, 
+        verbose_name="Usuario Asociado"
+    )
     
     class Meta:
         db_table = 'persona'
@@ -103,6 +110,13 @@ class Empleado(models.Model):
     imagen = models.URLField(blank=True, null=True, verbose_name='Imagen')
     fecha_registro = models.DateTimeField(default=timezone.now, verbose_name="Fecha de Registro")
     luxand_uuid = models.CharField(max_length=64, blank=True, null=True)
+    user = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE, 
+        blank=True, 
+        null=True, 
+        verbose_name="Usuario Asociado"
+    )
     
     # Relación con Cargo
     cargo = models.ForeignKey(

@@ -3,6 +3,7 @@ from ..models import Persona
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import date
+from django.contrib.auth.models import User
 
 
 class PersonaSerializer(serializers.ModelSerializer):
@@ -11,12 +12,17 @@ class PersonaSerializer(serializers.ModelSerializer):
     """
     nombre_completo = serializers.ReadOnlyField()
     luxand_uuid = serializers.ReadOnlyField()
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        allow_null=True,
+        required=False
+    )
     class Meta:
         model = Persona
         fields = [
             'id', 'nombre', 'apellido', 'telefono', 'imagen', 'estado', 
             'sexo', 'tipo', 'fecha_registro', 'CI', 'fecha_nacimiento', 
-            'nombre_completo', 'luxand_uuid'
+            'nombre_completo', 'luxand_uuid', 'user'
         ]
         read_only_fields = ['id', 'fecha_registro', 'luxand_uuid']
     
@@ -47,12 +53,17 @@ class PersonaSinTipoSerializer(serializers.ModelSerializer):
     """
     nombre_completo = serializers.ReadOnlyField()
     luxand_uuid = serializers.ReadOnlyField()
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        allow_null=True,
+        required=False
+    )
     class Meta:
         model = Persona
         fields = [
             'id', 'nombre', 'apellido', 'telefono', 'imagen', 'estado', 
             'sexo', 'fecha_registro', 'CI', 'fecha_nacimiento', 
-            'nombre_completo', 'luxand_uuid'
+            'nombre_completo', 'luxand_uuid', 'user'
         ]
         read_only_fields = ['id', 'fecha_registro', 'luxand_uuid']
     

@@ -31,6 +31,7 @@ class PropietarioViewSet(viewsets.ModelViewSet):
     ordering = ['apellido', 'nombre']
     
     def perform_create(self, serializer):
+        user_id = serializer.validated_data.get('user')
         serializer.save(tipo='P')
     
     def perform_update(self, serializer):

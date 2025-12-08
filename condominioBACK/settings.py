@@ -16,7 +16,8 @@ import dj_database_url
 from datetime import timedelta
 import os
 import cloudinary
-
+import firebase_admin
+from firebase_admin import credentials
 
 
 
@@ -53,7 +54,8 @@ INSTALLED_APPS = [
     'administracion',
     'finanzas',
     'residencial',
-    'seguridad_IA'
+    'seguridad_IA',
+    'fcm_django',
 ]
 
 MIDDLEWARE = [
@@ -97,6 +99,31 @@ DATABASES = {
     )
 }
 
+try:
+    if not firebase_admin._apps:
+        # 1. Intentamos leer la variable de entorno (Ideal para Railway/Producción)
+        # Usamos default=None para que no de error si no existe en tu .env local
+        firebase_json_str = config('FIREBASE_CREDENTIALS_JSON', default=None)
+
+        if firebase_json_str:
+            # Si existe la variable (Producción), convertimos el texto a diccionario
+            cred_dict = json.loads(firebase_json_str)
+            cred = credentials.Certificate(cred_dict)
+        else:
+            # 2. Fallback: Leemos el archivo físico (Ideal para Local)
+            # Asegúrate de que este nombre sea correcto
+            cred = credentials.Certificate("smart-condominiun-firebase-adminsdk-fbsvc-30dd8b557d.json")
+            
+        firebase_admin.initialize_app(cred)
+        print("Firebase inicializado correctamente.")
+
+except Exception as e:
+    print(f"Error inicializando Firebase: {e}")
+
+FCM_DJANGO_SETTINGS = {
+    # Usamos config con un default vacío por si acaso
+    "FCM_SERVER_KEY": config("FCM_SERVER_KEY", default=""), 
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

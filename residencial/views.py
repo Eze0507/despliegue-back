@@ -1,4 +1,4 @@
-from rest_framework import status, viewsets, filters, generics
+from rest_framework import status, viewsets, filters, generics, permissions, serializers
 from django.db.models import Q, Count, Avg
 from django.db.models import ProtectedError
 from rest_framework.response import Response
@@ -8,12 +8,15 @@ from administracion.models import Persona
 from administracion.serializers.serializersPersona import (
     PersonaSerializer, PropietarioSerializer, VisitanteSerializer
 )
-from .models import Inquilino, Familiares, Visitante, Mascota
+from .models import Inquilino, Familiares, Visitante, Mascota, AreasComunes, ReservaAreaComun
 from .serializers.serializersInquilino import InquilinoSerializer, InquilinoListSerializer
 from .serializers.serializersFamiliares import FamiliaresSerializer, FamiliaresListSerializer
 from .serializers.serializersMascota import MascotaSerializer, MascotaListSerializer
 import requests
 from django.conf import settings
+from residencial.serializers.serializersArea import AreaSerializer
+from residencial.serializers.serializersReserva import ReservaAreaComunSerializer
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 # Create your views here.
 
@@ -364,3 +367,82 @@ class VisitanteViewSet(viewsets.ModelViewSet):
         
         return action(request, *args, **kwargs)
 
+class AreaViewSet(viewsets.ModelViewSet):
+    serializer_class = AreaSerializer
+    queryset = AreasComunes.objects.all()
+
+class ReservaAreaComunViewSet(viewsets.ModelViewSet):
+    serializer_class = ReservaAreaComunSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def es_administrador(self, user):
+        """
+        Método auxiliar para verificar si el usuario es Admin.
+        Verifica si está en el grupo 'Administrador' o si es Superusuario.
+        """
+        return user.groups.filter(name='administrador').exists() or user.is_superuser
+
+    def get_queryset(self):
+        """
+        Filtrado de reservas:
+        - Admin: Ve TODO.
+        - Propietario/Inquilino: Ve solo SU historial.
+        """
+        user = self.request.user
+
+        if self.es_administrador(user):
+            # El administrador ve todas las reservas para gestionarlas
+            return ReservaAreaComun.objects.all()
+        
+        # Si no es admin, debe tener una Persona asociada
+        if hasattr(user, 'persona'):
+            return ReservaAreaComun.objects.filter(persona=user.persona)
+        
+        # Si es un usuario sin rol y sin persona, no ve nada
+        return ReservaAreaComun.objects.none()
+
+    def perform_create(self, serializer):
+        """
+        Creación de reserva:
+        - Admin: Puede reservar a nombre de CUALQUIER persona (debe enviar el ID).
+        - Propietario: Se le asigna automáticamente su propia Persona.
+        """
+        user = self.request.user
+
+        if self.es_administrador(user):
+            # CASO ADMIN:
+            # Confiamos en el 'persona' que viene en el body del request.
+            # El serializer ya validó que el ID enviado exista.
+            serializer.save()
+        else:
+            # CASO PROPIETARIO:
+            # Verificamos que tenga perfil de persona
+            if not hasattr(user, 'persona'):
+                raise ValidationError("Tu usuario no tiene un perfil de residente asociado.")
+            
+            # Forzamos que la reserva sea para él mismo, ignorando lo que envíe en el JSON
+            serializer.save(persona=user.persona)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Eliminación:
+        - Admin: Puede borrar cualquier reserva.
+        - Propietario: Solo puede borrar si está PENDIENTE.
+        """
+        instance = self.get_object()
+        user = request.user
+
+        # Si NO es administrador, aplicamos restricciones
+        if not self.es_administrador(user):
+            # 1. Verificar que la reserva sea suya (por seguridad extra)
+            if instance.persona.user != user:
+                raise PermissionDenied("No puedes eliminar una reserva que no es tuya.")
+
+            # 2. Verificar estado
+            if instance.estado_reserva != 'PENDIENTE':
+                return Response(
+                    {"error": "Solo puedes cancelar reservas que aún están pendientes. Contacta a administración."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        return super().destroy(request, *args, **kwargs)

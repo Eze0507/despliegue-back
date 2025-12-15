@@ -269,3 +269,73 @@ class ObjetoPerdido(models.Model):
 
     def __str__(self):
         return f"{self.titulo} ({self.get_estado_display()})"
+
+class AreasComunes(models.Model):
+    CHOISES_ESTADO = [
+        ('A', 'Activo'),
+        ('I', 'Inactivo'),
+    ]
+    nombre = models.CharField(max_length=100, verbose_name="Nombre del Área")
+    descripcion = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    ubicacion = models.CharField(max_length=100, verbose_name="Ubicación dentro del residencial")
+    capacidad_maxima = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        verbose_name="Capacidad Máxima"
+    )
+    horario_apertura = models.TimeField(verbose_name="Horario de Apertura")
+    horario_cierre = models.TimeField(verbose_name="Horario de Cierre")
+    estado = models.CharField(
+        max_length=1,
+        choices=CHOISES_ESTADO,
+        default='A',
+        verbose_name="Estado del Área"
+    )
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = "Área Común"
+        verbose_name_plural = "Áreas Comunes"
+
+    def __str__(self):
+        return self.nombre
+
+class ReservaAreaComun(models.Model):
+    ESTADO_RESERVA_CHOICES = [
+        ('PENDIENTE', 'Pendiente'),
+        ('CONFIRMADA', 'Confirmada'),
+        ('CANCELADA', 'Cancelada'),
+        ('COMPLETADA', 'Completada'),
+    ]
+
+    area_comun = models.ForeignKey(
+        AreasComunes,
+        on_delete=models.CASCADE,
+        related_name='reservas',
+        verbose_name="Área Común"
+    )
+    persona = models.ForeignKey(
+        'administracion.Persona',
+        on_delete=models.CASCADE,
+        related_name='reservas_area_comun',
+        limit_choices_to=models.Q(tipo='P') | models.Q(tipo='I'),
+        verbose_name="Persona que Reserva"
+    )
+    fecha_reserva = models.DateField(verbose_name="Fecha de la Reserva")
+    hora_inicio = models.TimeField(verbose_name="Hora de Inicio")
+    hora_fin = models.TimeField(verbose_name="Hora de Fin")
+    estado_reserva = models.CharField(
+        max_length=10,
+        choices=ESTADO_RESERVA_CHOICES,
+        default='PENDIENTE',
+        verbose_name="Estado de la Reserva"
+    )
+    fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Registro")
+
+    class Meta:
+        db_table = 'reserva_area_comun'
+        verbose_name = "Reserva de Área Común"
+        verbose_name_plural = "Reservas de Áreas Comunes"
+        ordering = ['-fecha_reserva', '-hora_inicio']
+
+    def __str__(self):
+        return f"Reserva de {self.persona.nombre_completo} para {self.area_comun.nombre} el {self.fecha_reserva}"
